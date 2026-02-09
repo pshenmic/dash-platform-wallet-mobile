@@ -1,27 +1,30 @@
-import { useState, useEffect } from 'react';
-import { View, TextInput, Button, Text, StyleSheet, Alert, ScrollView } from 'react-native';
+import { useSecureStorage } from '@/contexts/SecureStorageContext';
+import { Button, DashLogo, Heading, Text } from 'dash-ui-kit/react-native';
 import { router } from 'expo-router';
-import { useSecureStorage } from '@/hooks/use-secure-storage';
+import { useEffect, useState } from 'react';
+import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import Svg, { Path } from 'react-native-svg';
 
 export default function WalletScreen() {
-  const [seedPhrase, setSeedPhrase] = useState('');
   const [savedSeedPhrase, setSavedSeedPhrase] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-  const { isUnlocked, lock, saveItem, getItem, removeItem, error } = useSecureStorage();
+  const { isUnlocked, lock, getItem, removeItem } = useSecureStorage();
 
   useEffect(() => {
+    console.log('[WalletScreen] isUnlocked changed:', isUnlocked);
     checkLock();
-    loadSeedPhrase();
+    checkAndLoadSeedPhrase();
   }, [isUnlocked]);
 
   const checkLock = () => {
+    console.log('[WalletScreen] checkLock - isUnlocked:', isUnlocked);
     if (!isUnlocked) {
+      console.log('[WalletScreen] Not unlocked, redirecting to login');
       Alert.alert('Locked', 'Please login first');
       router.replace('/login');
     }
   };
 
-  const loadSeedPhrase = async () => {
+  const checkAndLoadSeedPhrase = async () => {
     if (!isUnlocked) return;
     
     try {
@@ -29,31 +32,36 @@ export default function WalletScreen() {
       setSavedSeedPhrase(saved);
     } catch (err) {
       console.error('Failed to load seed phrase:', err);
-    }
-  };
-
-  const handleSave = async () => {
-    if (!seedPhrase || seedPhrase.split(' ').length < 12) {
-      Alert.alert('Error', 'Please enter a valid seed phrase (at least 12 words)');
-      return;
-    }
-
-    try {
-      setLoading(true);
-      await saveItem('wallet_seed_phrase', seedPhrase);
-      Alert.alert('Success', 'Seed phrase saved securely!');
-      setSavedSeedPhrase(seedPhrase);
-      setSeedPhrase('');
-    } catch (err) {
-      Alert.alert('Error', error?.message || 'Save failed');
-    } finally {
-      setLoading(false);
+      
+      // If decryption failed, data is corrupted - offer to clear it
+      if (err instanceof Error && err.message.includes('Decryption failed')) {
+        Alert.alert(
+          'Corrupted Data',
+          'Saved seed phrase is corrupted or encrypted with a different password. Clear it?',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            {
+              text: 'Clear',
+              style: 'destructive',
+              onPress: async () => {
+                try {
+                  await removeItem('wallet_seed_phrase');
+                  setSavedSeedPhrase(null);
+                  Alert.alert('Cleared', 'Corrupted data removed');
+                } catch (clearErr) {
+                  console.error('Failed to clear:', clearErr);
+                  Alert.alert('Error', 'Failed to clear corrupted data');
+                }
+              },
+            },
+          ]
+        );
+      }
     }
   };
 
   const handleLock = () => {
     lock();
-    Alert.alert('Locked', 'Wallet locked');
     router.replace('/login');
   };
 
@@ -70,9 +78,10 @@ export default function WalletScreen() {
             try {
               await removeItem('wallet_seed_phrase');
               setSavedSeedPhrase(null);
-              Alert.alert('Success', 'Seed phrase cleared');
+              Alert.alert('Success', 'Seed phrase cleared. Redirecting...');
+              router.replace('/welcome');
             } catch (err) {
-              Alert.alert('Error', error?.message || 'Failed to clear');
+              Alert.alert('Error', 'Failed to clear seed phrase');
             }
           },
         },
@@ -80,55 +89,84 @@ export default function WalletScreen() {
     );
   };
 
+  const words = savedSeedPhrase ? savedSeedPhrase.split(' ') : [];
+
   return (
-    <ScrollView style={styles.container}>
-      <Text style={styles.title}>Wallet</Text>
-      
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Save Seed Phrase</Text>
-        <Text style={styles.hint}>
-          Enter your 12-24 word seed phrase (space-separated)
+    <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
+      {/* Header */}
+      <View style={styles.header}>
+        <DashLogo />
+
+        <Heading level={1} weight="extrabold" style={styles.title}>
+          Your Wallet
+        </Heading>
+
+        <Text variant="body" weight="medium" opacity={50} style={styles.subtitle}>
+          Your seed phrase is safely stored and encrypted
         </Text>
-        
-        <TextInput
-          style={styles.textarea}
-          placeholder="word1 word2 word3 ..."
-          value={seedPhrase}
-          onChangeText={setSeedPhrase}
-          multiline
-          numberOfLines={4}
-          autoCapitalize="none"
-          autoCorrect={false}
-        />
-        
-        <Button
-          title={loading ? 'Saving...' : 'Save Encrypted'}
-          onPress={handleSave}
-          disabled={loading}
-        />
       </View>
 
+      {/* Seed Phrase Display */}
       {savedSeedPhrase && (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Saved Seed Phrase (Decrypted)</Text>
-          <View style={styles.savedBox}>
-            <Text style={styles.savedText}>{savedSeedPhrase}</Text>
-          </View>
-          <Text style={styles.hint}>
-            ✅ This is stored encrypted and only visible when unlocked
+        <View style={styles.phraseContainer}>
+          <Text variant="body" weight="semibold" style={styles.sectionTitle}>
+            Seed Phrase ({words.length} words)
           </Text>
-          <Button title="Clear Saved Seed" onPress={handleClear} color="red" />
+
+          <View style={styles.wordsGrid}>
+            {words.map((word, index) => (
+              <View key={index} style={styles.wordItem}>
+                <Text variant="caption" weight="medium" opacity={50} style={styles.wordNumber}>
+                  {index + 1}.
+                </Text>
+                <Text variant="body" weight="medium" style={styles.wordText}>
+                  {word}
+                </Text>
+              </View>
+            ))}
+          </View>
+
+          <View style={styles.warningBox}>
+            <Svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+              <Path
+                d="M10 0C4.48 0 0 4.48 0 10C0 15.52 4.48 20 10 20C15.52 20 20 15.52 20 10C20 4.48 15.52 0 10 0ZM11 15H9V13H11V15ZM11 11H9V5H11V11Z"
+                fill="#FF9500"
+              />
+            </Svg>
+            <Text variant="caption" weight="medium" style={styles.warningText}>
+              Keep your seed phrase secret and secure. Anyone with access to it can control your wallet.
+            </Text>
+          </View>
         </View>
       )}
 
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Security</Text>
-        <Text style={styles.hint}>
-          🔒 Your seed phrase is encrypted with AES-256-GCM{'\n'}
-          🔑 Only accessible with your password{'\n'}
-          📱 Stored securely using device keychain
-        </Text>
-        <Button title="Lock Wallet" onPress={handleLock} />
+      {/* Actions */}
+      <View style={styles.actionsContainer}>
+        <Button
+          variant="outline"
+          colorScheme="brand"
+          size="xl"
+          onPress={handleLock}
+          style={styles.actionButton}
+        >
+          <Text weight="medium" style={styles.actionButtonText}>
+            Lock Wallet
+          </Text>
+        </Button>
+
+        {savedSeedPhrase && (
+          <Button
+            variant="outline"
+            colorScheme="brand"
+            size="xl"
+            onPress={handleClear}
+            style={[styles.actionButton, styles.deleteButton]}
+          >
+            <Text weight="medium" style={styles.deleteButtonText}>
+              Clear Wallet
+            </Text>
+          </Button>
+        )}
       </View>
     </ScrollView>
   );
@@ -137,51 +175,100 @@ export default function WalletScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 20,
-    backgroundColor: '#fff',
+    backgroundColor: '#FFFFFF',
+  },
+  contentContainer: {
+    paddingTop: 60,
+    paddingHorizontal: 20,
+    paddingBottom: 47,
+  },
+  header: {
+    alignItems: 'flex-start',
+    gap: 10,
+    marginBottom: 40,
   },
   title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    marginTop: 40,
-    marginBottom: 20,
-    textAlign: 'center',
+    fontSize: 40,
+    lineHeight: 50,
+    letterSpacing: -1.2,
+    color: '#0C1C33',
   },
-  section: {
+  subtitle: {
+    fontSize: 14,
+    lineHeight: 17,
+    color: 'rgba(12, 28, 51, 0.5)',
+  },
+  phraseContainer: {
     marginBottom: 30,
-    padding: 15,
-    backgroundColor: '#f5f5f5',
-    borderRadius: 10,
   },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    marginBottom: 10,
-  },
-  hint: {
-    fontSize: 12,
-    color: '#666',
+    fontSize: 16,
+    color: '#0C1C33',
     marginBottom: 15,
-    lineHeight: 18,
   },
-  textarea: {
+  wordsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginBottom: 20,
+  },
+  wordItem: {
+    width: '31%',
+    backgroundColor: 'rgba(12, 28, 51, 0.03)',
+    borderRadius: 15,
     borderWidth: 1,
-    borderColor: '#ddd',
-    padding: 15,
-    marginBottom: 15,
-    borderRadius: 8,
-    fontSize: 14,
-    backgroundColor: '#fff',
-    minHeight: 100,
+    borderColor: 'rgba(12, 28, 51, 0.1)',
+    paddingVertical: 10,
+    paddingHorizontal: 15,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
   },
-  savedBox: {
-    backgroundColor: '#e8f5e9',
-    padding: 15,
-    borderRadius: 8,
-    marginBottom: 10,
+  wordNumber: {
+    fontSize: 12,
+    color: 'rgba(12, 28, 51, 0.5)',
   },
-  savedText: {
+  wordText: {
     fontSize: 14,
-    lineHeight: 22,
+    color: '#0C1C33',
+  },
+  warningBox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    backgroundColor: 'rgba(255, 149, 0, 0.1)',
+    padding: 15,
+    borderRadius: 15,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 149, 0, 0.2)',
+  },
+  warningText: {
+    flex: 1,
+    fontSize: 12,
+    lineHeight: 16,
+    color: '#FF9500',
+  },
+  actionsContainer: {
+    gap: 12,
+    marginTop: 'auto',
+  },
+  actionButton: {
+    backgroundColor: 'rgba(76, 126, 255, 0.15)',
+    borderWidth: 0,
+    borderRadius: 15,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    height: 58,
+  },
+  actionButtonText: {
+    fontSize: 16,
+    color: '#4C7EFF',
+  },
+  deleteButton: {
+    backgroundColor: 'rgba(255, 59, 48, 0.1)',
+  },
+  deleteButtonText: {
+    fontSize: 16,
+    color: '#FF3B30',
   },
 });

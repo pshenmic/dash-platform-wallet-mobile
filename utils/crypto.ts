@@ -102,28 +102,43 @@ export async function encrypt(
  * @param key - Encryption key (hex string)
  * @param iv - Initialization vector (hex string)
  * @returns Decrypted plaintext
+ * @throws Error if decryption fails or data is corrupted
  */
 export async function decrypt(
   ciphertext: string,
   key: string,
   iv: string
 ): Promise<string> {
-  // Convert to WordArrays
-  const keyWordArray = CryptoJS.enc.Hex.parse(key);
-  const ivWordArray = CryptoJS.enc.Hex.parse(iv);
-  const ciphertextWordArray = CryptoJS.enc.Hex.parse(ciphertext);
-  
-  const cipherParams = CryptoJS.lib.CipherParams.create({
-    ciphertext: ciphertextWordArray
-  });
-  
-  const decrypted = CryptoJS.AES.decrypt(cipherParams, keyWordArray, {
-    iv: ivWordArray,
-    mode: CryptoJS.mode.CBC,
-    padding: CryptoJS.pad.Pkcs7
-  });
-  
-  return decrypted.toString(CryptoJS.enc.Utf8);
+  try {
+    // Convert to WordArrays
+    const keyWordArray = CryptoJS.enc.Hex.parse(key);
+    const ivWordArray = CryptoJS.enc.Hex.parse(iv);
+    const ciphertextWordArray = CryptoJS.enc.Hex.parse(ciphertext);
+    
+    const cipherParams = CryptoJS.lib.CipherParams.create({
+      ciphertext: ciphertextWordArray
+    });
+    
+    const decrypted = CryptoJS.AES.decrypt(cipherParams, keyWordArray, {
+      iv: ivWordArray,
+      mode: CryptoJS.mode.CBC,
+      padding: CryptoJS.pad.Pkcs7
+    });
+    
+    const result = decrypted.toString(CryptoJS.enc.Utf8);
+    
+    // Validate decryption - empty result means wrong key
+    if (!result || result.length === 0) {
+      throw new Error('Decryption failed: wrong key or corrupted data');
+    }
+    
+    return result;
+  } catch (error) {
+    if (error instanceof Error && error.message.includes('Malformed UTF-8')) {
+      throw new Error('Decryption failed: invalid password or corrupted data');
+    }
+    throw error;
+  }
 }
 
 /**

@@ -1,13 +1,14 @@
 /**
- * Hook for secure storage
+ * Global Context for Secure Storage state
  * 
- * Manages password-protected encrypted storage for sensitive data
+ * Shares isUnlocked and isInitialized state across all components
  */
 
-import { useState, useCallback, useEffect } from 'react';
+import { createContext, useContext, ReactNode, useState, useCallback, useEffect } from 'react';
 import { secureStorage } from '@/services/storage/secure-storage';
+import * as SecureStore from 'expo-secure-store';
 
-interface UseSecureStorageReturn {
+interface SecureStorageContextType {
   isUnlocked: boolean;
   isInitialized: boolean | null;
   initialize: (password: string) => Promise<void>;
@@ -20,38 +21,40 @@ interface UseSecureStorageReturn {
   error: Error | null;
 }
 
-export function useSecureStorage(): UseSecureStorageReturn {
+const SecureStorageContext = createContext<SecureStorageContextType | undefined>(undefined);
+
+export function SecureStorageProvider({ children }: { children: ReactNode }) {
   const [isUnlocked, setIsUnlocked] = useState(false);
   const [isInitialized, setIsInitialized] = useState<boolean | null>(null);
   const [error, setError] = useState<Error | null>(null);
 
   const checkInitialized = useCallback(async () => {
     try {
-      const salt = await import('expo-secure-store').then(store => 
-        store.getItemAsync('encryption_salt')
-      );
+      const salt = await SecureStore.getItemAsync('encryption_salt');
       const initialized = !!salt;
-      console.log('[useSecureStorage] checkInitialized - salt exists:', initialized);
+      console.log('[SecureStorageContext] checkInitialized - salt exists:', initialized);
       setIsInitialized(initialized);
     } catch (err) {
-      console.error('[useSecureStorage] checkInitialized error:', err);
+      console.error('[SecureStorageContext] checkInitialized error:', err);
       setError(err as Error);
       setIsInitialized(false);
     }
   }, []);
 
-  // Check if already initialized
   useEffect(() => {
     checkInitialized();
   }, [checkInitialized]);
 
   const initialize = useCallback(async (password: string) => {
     try {
+      console.log('[SecureStorageContext] Initializing...');
       setError(null);
       await secureStorage.initialize(password);
       setIsUnlocked(true);
       setIsInitialized(true);
+      console.log('[SecureStorageContext] Initialize complete - isUnlocked: true, isInitialized: true');
     } catch (err) {
+      console.error('[SecureStorageContext] Initialize error:', err);
       setError(err as Error);
       throw err;
     }
@@ -59,17 +62,21 @@ export function useSecureStorage(): UseSecureStorageReturn {
 
   const unlock = useCallback(async (password: string): Promise<boolean> => {
     try {
+      console.log('[SecureStorageContext] Unlocking...');
       setError(null);
       const success = await secureStorage.unlock(password);
       setIsUnlocked(success);
+      console.log('[SecureStorageContext] Unlock result:', success);
       return success;
     } catch (err) {
+      console.error('[SecureStorageContext] Unlock error:', err);
       setError(err as Error);
       return false;
     }
   }, []);
 
   const lock = useCallback(() => {
+    console.log('[SecureStorageContext] Locking...');
     secureStorage.lock();
     setIsUnlocked(false);
   }, []);
@@ -106,34 +113,48 @@ export function useSecureStorage(): UseSecureStorageReturn {
 
   const reset = useCallback(async () => {
     try {
-      console.log('[useSecureStorage] Resetting storage...');
+      console.log('[SecureStorageContext] Resetting storage...');
       setError(null);
       await secureStorage.reset();
       setIsUnlocked(false);
       setIsInitialized(false);
-      console.log('[useSecureStorage] Reset complete - isInitialized set to false');
+      console.log('[SecureStorageContext] Reset complete - isInitialized set to false');
       
       // Recheck after a short delay to ensure state is updated
       setTimeout(() => {
         checkInitialized();
       }, 100);
     } catch (err) {
-      console.error('[useSecureStorage] Reset error:', err);
+      console.error('[SecureStorageContext] Reset error:', err);
       setError(err as Error);
       throw err;
     }
   }, [checkInitialized]);
 
-  return {
-    isUnlocked,
-    isInitialized,
-    initialize,
-    unlock,
-    lock,
-    saveItem,
-    getItem,
-    removeItem,
-    reset,
-    error,
-  };
+  return (
+    <SecureStorageContext.Provider
+      value={{
+        isUnlocked,
+        isInitialized,
+        initialize,
+        unlock,
+        lock,
+        saveItem,
+        getItem,
+        removeItem,
+        reset,
+        error,
+      }}
+    >
+      {children}
+    </SecureStorageContext.Provider>
+  );
+}
+
+export function useSecureStorage() {
+  const context = useContext(SecureStorageContext);
+  if (context === undefined) {
+    throw new Error('useSecureStorage must be used within a SecureStorageProvider');
+  }
+  return context;
 }

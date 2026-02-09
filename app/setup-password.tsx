@@ -1,7 +1,8 @@
-import { useState } from 'react';
-import { View, TextInput, Button, Text, StyleSheet, Alert } from 'react-native';
-import { router } from 'expo-router';
-import { useSecureStorage } from '@/hooks/use-secure-storage';
+import { useSecureStorage } from '@/contexts/SecureStorageContext'
+import { Button, DashLogo, Heading, Input, Text } from 'dash-ui-kit/react-native'
+import { router } from 'expo-router'
+import { useState } from 'react'
+import { Alert, StyleSheet, View } from 'react-native'
 
 export default function SetupPasswordScreen() {
   const [password, setPassword] = useState('');
@@ -22,10 +23,20 @@ export default function SetupPasswordScreen() {
 
     try {
       setLoading(true);
+      console.log('[SetupPassword] Initializing with password');
       await initialize(password);
-      Alert.alert('Success', 'Password created!');
-      router.replace('/wallet');
+      console.log('[SetupPassword] Initialization complete');
+      
+      if (__DEV__) {
+        Alert.alert('Success', `Password created!\n\nDEV: Your password is "${password}"`);
+      } else {
+        Alert.alert('Success', 'Password created!');
+      }
+      
+      console.log('[SetupPassword] Navigating to welcome...');
+      router.replace('/welcome');
     } catch (err) {
+      console.error('[SetupPassword] Setup failed:', err);
       Alert.alert('Error', error?.message || 'Setup failed');
     } finally {
       setLoading(false);
@@ -34,32 +45,91 @@ export default function SetupPasswordScreen() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Setup Password</Text>
-      <Text style={styles.subtitle}>Create a password to protect your wallet</Text>
+      {/* Header Section */}
+      <View style={styles.header}>
+        <DashLogo />
+        
+        <Heading 
+          level={1}
+          weight="semibold"
+          style={styles.title}
+        >
+          Setup Password
+        </Heading>
+        
+        <Text 
+          variant="body"
+          weight="regular"
+          opacity={60}
+          style={styles.subtitle}
+        >
+          Create a password to protect your wallet.
+        </Text>
+      </View>
 
-      <TextInput
-        style={styles.input}
-        placeholder="Enter password"
-        secureTextEntry
-        value={password}
-        onChangeText={setPassword}
-        autoCapitalize="none"
-      />
+      {/* Password Setup Block */}
+      <View style={styles.authBlock}>
+        <View style={styles.inputSection}>
+          <Text 
+            variant="body"
+            weight="regular"
+            opacity={60}
+            style={styles.inputLabel}
+          >
+            Password
+          </Text>
+          
+          <Input
+            placeholder="Enter Password"
+            secureTextEntry
+            value={password}
+            onChangeText={setPassword}
+            autoCapitalize="none"
+            autoFocus
+            size="xl"
+            variant="outlined"
+            style={styles.input}
+            textStyle={styles.inputText}
+          />
+        </View>
 
-      <TextInput
-        style={styles.input}
-        placeholder="Confirm password"
-        secureTextEntry
-        value={confirmPassword}
-        onChangeText={setConfirmPassword}
-        autoCapitalize="none"
-      />
+        <View style={styles.inputSection}>
+          <Text 
+            variant="body"
+            weight="regular"
+            opacity={60}
+            style={styles.inputLabel}
+          >
+            Confirm Password
+          </Text>
+          
+          <Input
+            placeholder="Re-enter Password"
+            secureTextEntry
+            value={confirmPassword}
+            onChangeText={setConfirmPassword}
+            autoCapitalize="none"
+            size="xl"
+            variant="outlined"
+            style={styles.input}
+            textStyle={styles.inputText}
+          />
+        </View>
 
-      <Button
-        title={loading ? 'Setting up...' : 'Create Password'}
-        onPress={handleSetup}
-        disabled={loading}
-      />
+        <Button
+          variant="solid"
+          colorScheme="brand"
+          size="xl"
+          onPress={handleSetup}
+          disabled={loading || !password || !confirmPassword}
+          loading={loading}
+          style={styles.button}
+        >
+          <Text weight="regular" style={styles.buttonText}>
+            Create Password
+          </Text>
+        </Button>
+      </View>
     </View>
   );
 }
@@ -67,28 +137,59 @@ export default function SetupPasswordScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 20,
-    justifyContent: 'center',
-    backgroundColor: '#fff',
+    backgroundColor: '#F3F3F3',
+    paddingTop: 60,
+    paddingHorizontal: 20,
+    paddingBottom: 40,
+  },
+  header: {
+    alignItems: 'flex-start',
+    marginBottom: 60,
   },
   title: {
-    fontSize: 24,
-    fontWeight: 'bold',
+    fontSize: 40,
+    lineHeight: 50,
+    letterSpacing: -1.2,
+    color: '#0C1C33',
     marginBottom: 10,
-    textAlign: 'center',
   },
   subtitle: {
     fontSize: 14,
-    color: '#666',
-    marginBottom: 30,
-    textAlign: 'center',
+    lineHeight: 17,
+    color: 'rgba(12, 28, 51, 0.5)',
+  },
+  authBlock: {
+    gap: 15,
+    paddingHorizontal: 10,
+  },
+  inputSection: {
+    gap: 10,
+  },
+  inputLabel: {
+    fontSize: 16,
+    lineHeight: 19,
+    color: 'rgba(12, 28, 51, 0.5)',
   },
   input: {
+    borderRadius: 20,
+    borderColor: 'rgba(12, 28, 51, 0.32)',
     borderWidth: 1,
-    borderColor: '#ddd',
-    padding: 15,
-    marginBottom: 15,
-    borderRadius: 8,
+    backgroundColor: 'transparent',
+    paddingHorizontal: 25,
+    paddingVertical: 20,
+  },
+  inputText: {
+    fontSize: 14,
+    color: 'rgba(12, 28, 51, 0.35)',
+  },
+  button: {
+    backgroundColor: 'rgba(76, 126, 255, 0.15)',
+    borderRadius: 15,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+  },
+  buttonText: {
     fontSize: 16,
+    color: '#4C7EFF',
   },
 });
