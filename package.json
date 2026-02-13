@@ -18,7 +18,7 @@
     "@react-navigation/native": "^7.1.8",
     "@types/crypto-js": "^4.2.2",
     "crypto-js": "^4.2.0",
-    "dash-ui-kit": "file:../dash-ui/dash-ui-kit-1.0.94.tgz",
+    "dash-ui-kit": "github:AlexeyTripleA/dash-ui-kit#feat/react-native",
     "expo": "~54.0.32",
     "expo-constants": "~18.0.13",
     "expo-crypto": "~15.0.8",
