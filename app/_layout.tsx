@@ -4,8 +4,8 @@ import { StatusBar } from 'expo-status-bar';
 import 'react-native-reanimated';
 import "../global.css";
 
-import { useColorScheme } from '@/hooks/use-color-scheme';
 import { SecureStorageProvider } from '@/contexts/SecureStorageContext';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 
 export const unstable_settings = {
   anchor: '(tabs)',
@@ -18,6 +18,7 @@ export default function RootLayout() {
     <SecureStorageProvider>
       <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
         <Stack>
+          <Stack.Screen name="index" options={{ headerShown: false }} />
           <Stack.Screen name="welcome" options={{ headerShown: false }} />
           <Stack.Screen name="import-wallet-type" options={{ headerShown: false }} />
           <Stack.Screen name="import-seed-phrase" options={{ headerShown: false }} />

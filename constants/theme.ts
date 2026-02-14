@@ -16,6 +16,8 @@ export const Colors = {
     icon: '#687076',
     tabIconDefault: '#687076',
     tabIconSelected: tintColorLight,
+    overlay: 'rgba(0, 0, 0, 0.08)',
+    overlayStrong: 'rgba(0, 0, 0, 0.12)',
   },
   dark: {
     text: '#ECEDEE',
@@ -24,6 +26,8 @@ export const Colors = {
     icon: '#9BA1A6',
     tabIconDefault: '#9BA1A6',
     tabIconSelected: tintColorDark,
+    overlay: 'rgba(255, 255, 255, 0.08)',
+    overlayStrong: 'rgba(255, 255, 255, 0.12)',
   },
 };
 

@@ -76,7 +76,7 @@ export default function ImportSeedPhraseScreen() {
       await saveItem('wallet_seed_phrase', seedPhrase)
       
       Alert.alert('Success', 'Seed phrase imported successfully!')
-      router.replace('/wallet')
+      router.replace('/(tabs)/home')
     } catch (err) {
       console.error('Import failed:', err)
       Alert.alert('Error', error?.message || 'Failed to import seed phrase')

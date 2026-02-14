@@ -2,7 +2,7 @@ import { useSecureStorage } from '@/contexts/SecureStorageContext';
 import { Button, DashLogo, Heading, Text } from 'dash-ui-kit/react-native';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Alert, ScrollView, StyleSheet, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 
 export default function WalletScreen() {

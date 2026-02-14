@@ -1,5 +1,5 @@
-import { useBiometricAuth } from '@/hooks/use-biometric-auth'
 import { useSecureStorage } from '@/contexts/SecureStorageContext'
+import { useBiometricAuth } from '@/hooks/use-biometric-auth'
 import { Button, DashLogo, Heading, Input, Text } from 'dash-ui-kit/react-native'
 import { router } from 'expo-router'
 import { useCallback, useEffect, useState } from 'react'
@@ -43,11 +43,11 @@ export default function LoginScreen() {
 
           if (unlockSuccess) {
             // Check if wallet is set up (has seed phrase)
-            const { getItem } = await import('@/services/storage/secure-storage');
-            const hasSeedPhrase = await getItem('wallet_seed_phrase');
+            const { secureStorage } = await import('@/services/storage/secure-storage');
+            const hasSeedPhrase = await secureStorage.getItem('wallet_seed_phrase');
             
             if (hasSeedPhrase) {
-              router.replace('/wallet');
+              router.replace('/(tabs)/home');
             } else {
               router.replace('/welcome');
             }
@@ -103,11 +103,11 @@ export default function LoginScreen() {
         }
         
         // Check if wallet is set up (has seed phrase)
-        const { getItem } = await import('@/services/storage/secure-storage');
-        const hasSeedPhrase = await getItem('wallet_seed_phrase');
+        const { secureStorage } = await import('@/services/storage/secure-storage');
+        const hasSeedPhrase = await secureStorage.getItem('wallet_seed_phrase');
         
         if (hasSeedPhrase) {
-          router.replace('/wallet');
+          router.replace('/(tabs)/home');
         } else {
           router.replace('/welcome');
         }
