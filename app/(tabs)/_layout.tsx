@@ -1,9 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
 import React from 'react';
-import { StyleSheet } from 'react-native';
 
 import { HapticTab } from '@/components/haptic-tab';
+import { GlassTabBar } from '@/components/glass-tab-bar';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
@@ -12,13 +12,12 @@ export default function TabLayout() {
 
   return (
     <Tabs
+      tabBar={(props) => <GlassTabBar {...props} />}
       screenOptions={{
         tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
         tabBarInactiveTintColor: Colors[colorScheme ?? 'light'].tabIconDefault,
         headerShown: false,
         tabBarButton: HapticTab,
-        tabBarStyle: styles.tabBar,
-        tabBarItemStyle: styles.tabBarItem,
       }}>
       <Tabs.Screen
         name="home"
@@ -88,17 +87,3 @@ export default function TabLayout() {
     </Tabs>
   );
 }
-
-const styles = StyleSheet.create({
-  tabBar: {
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(0, 0, 0, 0.1)',
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-    paddingTop: 8,
-    paddingBottom: 8,
-    height: 64,
-  },
-  tabBarItem: {
-    paddingVertical: 4,
-  },
-});
