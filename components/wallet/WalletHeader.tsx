@@ -1,6 +1,6 @@
 import { StyleSheet, View } from 'react-native';
 
-import { NotificationButton } from './NotificationButton';
+import { NotificationButton } from '@/components/ui/NotificationButton';
 import { WalletSelector } from './WalletSelector';
 
 export interface WalletHeaderProps {

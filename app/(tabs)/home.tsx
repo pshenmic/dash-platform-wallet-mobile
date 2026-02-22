@@ -5,8 +5,8 @@
  * Displays wallet overview, balance, identity, and transactions.
  */
 
-import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
+import { router } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
 import { useCallback, useEffect, useState } from 'react';
 import {
@@ -18,11 +18,11 @@ import {
   View,
 } from 'react-native';
 
-import { BalanceDisplay } from '@/components/home/BalanceDisplay';
 import { HomeTabs } from '@/components/home/HomeTabs';
-import { IdentitySection } from '@/components/home/IdentitySection';
-import { TransactionList } from '@/components/home/TransactionList';
-import { WalletHeader } from '@/components/home/WalletHeader';
+import { TransactionList } from '@/components/transactions/TransactionList';
+import { BalanceDisplay } from '@/components/wallet/BalanceDisplay';
+import { IdentitySection } from '@/components/wallet/IdentitySection';
+import { WalletHeader } from '@/components/wallet/WalletHeader';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Colors } from '@/constants/theme';
