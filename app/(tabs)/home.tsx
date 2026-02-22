@@ -6,6 +6,7 @@
  */
 
 import { router } from 'expo-router';
+import { LinearGradient } from 'expo-linear-gradient';
 import * as SecureStore from 'expo-secure-store';
 import { useCallback, useEffect, useState } from 'react';
 import {
@@ -223,6 +224,15 @@ export default function HomeScreen() {
 
   return (
     <ThemedView style={styles.container}>
+      {/* Blue gradient glow — top hero area, matches Figma design */}
+      <LinearGradient
+        colors={['rgba(76, 126, 255, 0)', 'rgba(76, 126, 255, 0.85)', 'rgba(76, 126, 255, 0)']}
+        locations={[0, 0.3, 0.65]}
+        start={{ x: 1, y: 0 }}
+        end={{ x: 0, y: 1 }}
+        style={styles.heroGradient}
+        pointerEvents="none"
+      />
       <ScrollView 
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
@@ -303,6 +313,14 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  heroGradient: {
+    position: 'absolute',
+    top: 0,
+    left: -160,
+    width: 760,
+    height: 620,
+    zIndex: 0,
   },
   scrollView: {
     flex: 1,

@@ -2,87 +2,90 @@ import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { BlurView } from 'expo-blur';
+import { GlassView, isGlassEffectAPIAvailable } from 'expo-glass-effect';
 import { Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+
+const useNativeGlass = Platform.OS === 'ios' && isGlassEffectAPIAvailable();
 
 export function GlassTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
 
+  const tabItems = state.routes.map((route, index) => {
+    const { options } = descriptors[route.key];
+    const label =
+      options.tabBarLabel !== undefined
+        ? options.tabBarLabel
+        : options.title !== undefined
+        ? options.title
+        : route.name;
+
+    const isFocused = state.index === index;
+
+    const onPress = () => {
+      const event = navigation.emit({
+        type: 'tabPress',
+        target: route.key,
+        canPreventDefault: true,
+      });
+
+      if (!isFocused && !event.defaultPrevented) {
+        navigation.navigate(route.name, route.params);
+      }
+    };
+
+    const onLongPress = () => {
+      navigation.emit({
+        type: 'tabLongPress',
+        target: route.key,
+      });
+    };
+
+    const iconColor = isFocused ? colors.tint : colors.tabIconDefault;
+    const opacity = isFocused ? 1 : 0.5;
+
+    return (
+      <TouchableOpacity
+        key={route.key}
+        accessibilityRole="button"
+        accessibilityState={isFocused ? { selected: true } : {}}
+        accessibilityLabel={options.tabBarAccessibilityLabel}
+        testID={(options as { tabBarTestID?: string }).tabBarTestID}
+        onPress={onPress}
+        onLongPress={onLongPress}
+        style={styles.tabItem}
+      >
+        <View style={[styles.tabContent, { opacity }]}>
+          {options.tabBarIcon && options.tabBarIcon({
+            focused: isFocused,
+            color: iconColor,
+            size: 30,
+          })}
+          <Text
+            style={[
+              styles.tabLabel,
+              { color: iconColor },
+            ]}
+          >
+            {typeof label === 'string' ? label : ''}
+          </Text>
+        </View>
+      </TouchableOpacity>
+    );
+  });
+
   return (
     <View style={styles.container}>
       <View style={styles.shadowWrapper}>
-        <BlurView 
-          intensity={20} 
-          tint="light"
-          style={styles.blurContainer}
-        >
-          <View style={[styles.glassBackground, { backgroundColor: colors.glassBackground }]}>
-            {state.routes.map((route, index) => {
-            const { options } = descriptors[route.key];
-            const label =
-              options.tabBarLabel !== undefined
-                ? options.tabBarLabel
-                : options.title !== undefined
-                ? options.title
-                : route.name;
-
-            const isFocused = state.index === index;
-
-            const onPress = () => {
-              const event = navigation.emit({
-                type: 'tabPress',
-                target: route.key,
-                canPreventDefault: true,
-              });
-
-              if (!isFocused && !event.defaultPrevented) {
-                navigation.navigate(route.name, route.params);
-              }
-            };
-
-            const onLongPress = () => {
-              navigation.emit({
-                type: 'tabLongPress',
-                target: route.key,
-              });
-            };
-
-            const iconColor = isFocused ? colors.tint : colors.tabIconDefault;
-            const opacity = isFocused ? 1 : 0.5;
-
-            return (
-              <TouchableOpacity
-                key={route.key}
-                accessibilityRole="button"
-                accessibilityState={isFocused ? { selected: true } : {}}
-                accessibilityLabel={options.tabBarAccessibilityLabel}
-                testID={options.tabBarTestID}
-                onPress={onPress}
-                onLongPress={onLongPress}
-                style={styles.tabItem}
-              >
-                <View style={[styles.tabContent, { opacity }]}>
-                  {options.tabBarIcon && options.tabBarIcon({ 
-                    focused: isFocused, 
-                    color: iconColor, 
-                    size: 30 
-                  })}
-                  <Text 
-                    style={[
-                      styles.tabLabel, 
-                      { 
-                        color: iconColor,
-                      }
-                    ]}
-                  >
-                    {typeof label === 'string' ? label : ''}
-                  </Text>
-                </View>
-              </TouchableOpacity>
-            );
-          })}
+        <View style={[styles.glassContainer, !useNativeGlass && { backgroundColor: colors.glassBackground }]}>
+          {useNativeGlass && (
+            <GlassView style={StyleSheet.absoluteFill} />
+          )}
+          {!useNativeGlass && (
+            <BlurView intensity={20} tint="light" style={StyleSheet.absoluteFill} />
+          )}
+          {tabItems}
         </View>
-      </BlurView>
       </View>
     </View>
   );
@@ -99,6 +102,8 @@ const styles = StyleSheet.create({
   },
   shadowWrapper: {
     borderRadius: 48,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.35)',
     ...Platform.select({
       ios: {
         shadowColor: '#000000',
@@ -111,13 +116,9 @@ const styles = StyleSheet.create({
       },
     }),
   },
-  blurContainer: {
+  glassContainer: {
     borderRadius: 48,
     overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 1)',
-  },
-  glassBackground: {
     height: 65,
     flexDirection: 'row',
     alignItems: 'center',
@@ -136,7 +137,7 @@ const styles = StyleSheet.create({
   },
   tabLabel: {
     fontSize: 10,
-    fontWeight: '590' as any,
+    fontWeight: '590' as unknown as 'bold',
     textAlign: 'center',
     fontFamily: Platform.select({ ios: 'SF Pro', default: 'system' }),
   },

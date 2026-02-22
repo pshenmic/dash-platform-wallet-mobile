@@ -23,10 +23,9 @@ export interface AccountNameProps {
  */
 export function AccountName({ accountName, onEditPress }: AccountNameProps) {
   const iconColor = useThemeColor({}, 'text');
-  const backgroundColor = useThemeColor({}, 'background');
 
   return (
-    <View style={[styles.container, { backgroundColor }]}>
+    <View style={styles.container}>
       <ThemedText style={styles.accountName} numberOfLines={1}>
         {accountName}
       </ThemedText>

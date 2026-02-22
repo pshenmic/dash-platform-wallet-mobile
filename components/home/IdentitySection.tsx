@@ -37,11 +37,10 @@ export function IdentitySection({
   onAddressPress,
   onAccountNamePress,
 }: IdentitySectionProps) {
-  const backgroundColor = useThemeColor({}, 'background');
   const dividerColor = useThemeColor({}, 'overlay');
 
   return (
-    <View style={[styles.container, { backgroundColor }]}>
+    <View style={styles.container}>
       <View style={styles.addressContainer}>
         <AddressDisplay 
           address={address} 

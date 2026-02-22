@@ -25,13 +25,11 @@ export interface AddressDisplayProps {
  */
 export function AddressDisplay({ address, onPress }: AddressDisplayProps) {
   const iconColor = useThemeColor({}, 'text');
-  const backgroundColor = useThemeColor({}, 'background');
 
   return (
     <Pressable
       style={({ pressed }) => [
         styles.container,
-        { backgroundColor },
         pressed && styles.pressed,
       ]}
       onPress={() => onPress?.()}

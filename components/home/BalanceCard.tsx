@@ -47,13 +47,12 @@ function formatCurrency(value: number): string {
  */
 export function BalanceCard({ balance, usdValue }: BalanceCardProps) {
   const { isVisible, toggleVisibility, isLoading } = useBalanceVisibility();
-  const backgroundColor = useThemeColor({}, 'background');
   const iconColor = useThemeColor({}, 'icon');
   const textColor = useThemeColor({}, 'text');
 
   if (isLoading) {
     return (
-      <View style={[styles.container, { backgroundColor }]}>
+      <View style={styles.container}>
         <View style={styles.header}>
           <View style={[styles.skeleton, styles.skeletonLabel]} />
         </View>
@@ -64,7 +63,7 @@ export function BalanceCard({ balance, usdValue }: BalanceCardProps) {
   }
 
   return (
-    <View style={{ backgroundColor }}>
+    <View>
       {/* Header with Label and Eye Icon */}
       <View style={styles.header}>
         <Text style={styles.label}>Balance:</Text>

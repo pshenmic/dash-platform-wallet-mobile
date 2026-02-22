@@ -33,11 +33,10 @@ function formatCredits(value: number): string {
  * ```
  */
 export function PlatformBalance({ platformBalance }: PlatformBalanceProps) {
-  const backgroundColor = useThemeColor({}, 'background');
   const textColor = useThemeColor({}, 'text');
 
   return (
-    <View style={{ backgroundColor }}>
+    <View>
       <View style={styles.row}>
         <ThemedText style={styles.label}>Platform Balance:</ThemedText>
         <View style={styles.balanceContainer}>
