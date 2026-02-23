@@ -20,7 +20,6 @@ export default function RootLayout() {
         <Stack>
           <Stack.Screen name="index" options={{ headerShown: false }} />
           <Stack.Screen name="welcome" options={{ headerShown: false }} />
-          <Stack.Screen name="import-wallet-type" options={{ headerShown: false }} />
           <Stack.Screen name="import-seed-phrase" options={{ headerShown: false }} />
           <Stack.Screen name="setup-password" options={{ headerShown: false }} />
           <Stack.Screen name="login" options={{ headerShown: false }} />

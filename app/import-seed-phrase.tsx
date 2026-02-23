@@ -1,8 +1,10 @@
+import { PinScreenBackground } from '@/components/ui/PinScreenBackground'
+import { pinScreenStyles } from '@/app/pin-screen.styles'
 import { useSecureStorage } from '@/contexts/SecureStorageContext'
 import { Button, DashLogo, Heading, Input, Text } from 'dash-ui-kit/react-native'
 import { router } from 'expo-router'
 import { useState } from 'react'
-import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native'
+import { Alert, Image, Pressable, ScrollView, StyleSheet, View } from 'react-native'
 import Svg, { Path } from 'react-native-svg'
 
 type WordCount = 12 | 24
@@ -90,8 +92,18 @@ export default function ImportSeedPhraseScreen() {
   }
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
-      {/* Navigation Bar */}
+    <View style={styles.outerContainer}>
+      <PinScreenBackground />
+
+      <View style={pinScreenStyles.topImageSection}>
+        <Image
+          source={require('@/assets/images/bars.png')}
+          style={pinScreenStyles.barsImage}
+          resizeMode="cover"
+        />
+      </View>
+
+      {/* Navigation Bar — absolute over the decorative area */}
       <View style={styles.navBar}>
         <Pressable onPress={handleBack} style={styles.backButton}>
           <Svg width="24" height="24" viewBox="0 0 24 24" fill="none">
@@ -124,6 +136,7 @@ export default function ImportSeedPhraseScreen() {
         </View>
       </View>
 
+      <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
       {/* Header */}
       <View style={styles.header}>
         <DashLogo />
@@ -222,25 +235,34 @@ export default function ImportSeedPhraseScreen() {
           </Text>
         </Button>
       </View>
-    </ScrollView>
+      </ScrollView>
+    </View>
   )
 }
 
 const styles = StyleSheet.create({
-  container: {
+  outerContainer: {
     flex: 1,
     backgroundColor: '#FFFFFF',
   },
+  container: {
+    flex: 1,
+    backgroundColor: 'transparent',
+  },
   contentContainer: {
-    paddingTop: 14,
+    paddingTop: 200,
     paddingHorizontal: 20,
     paddingBottom: 47,
   },
   navBar: {
+    position: 'absolute',
+    top: 50,
+    left: 20,
+    right: 20,
+    zIndex: 10,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 20,
   },
   backButton: {
     width: 48,
@@ -265,7 +287,7 @@ const styles = StyleSheet.create({
   networkText: {
     fontSize: 14,
     lineHeight: 17,
-    color: '#FFFFFF',
+    color: '#0C1C33',
   },
   header: {
     alignItems: 'flex-start',
