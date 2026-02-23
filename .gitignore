@@ -33,6 +33,7 @@ yarn-error.*
 # IDE
 .vscode/
 .idea/
+.cursor/
 
 # local env files
 .env*.local

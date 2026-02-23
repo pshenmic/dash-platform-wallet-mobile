@@ -1,195 +1,150 @@
+import { PIN_LENGTH, PinDots, PinKeypad } from '@/components/ui/PinKeypad'
+import { PinScreenBackground } from '@/components/ui/PinScreenBackground'
 import { useSecureStorage } from '@/contexts/SecureStorageContext'
-import { Button, DashLogo, Heading, Input, Text } from 'dash-ui-kit/react-native'
+import { pinScreenStyles } from '@/app/pin-screen.styles'
+import { DashLogo, Heading, Text } from 'dash-ui-kit/react-native'
 import { router } from 'expo-router'
-import { useState } from 'react'
-import { Alert, StyleSheet, View } from 'react-native'
+import { useCallback, useRef, useState } from 'react'
+import { Alert, Image, StyleSheet, View, type TextStyle } from 'react-native'
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withSequence,
+  withTiming,
+} from 'react-native-reanimated'
+
+type Phase = 'enter' | 'confirm'
 
 export default function SetupPasswordScreen() {
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [loading, setLoading] = useState(false);
-  const { initialize, error } = useSecureStorage();
+  const [phase, setPhase] = useState<Phase>('enter')
+  const [pin, setPin] = useState('')
+  const [confirmPin, setConfirmPin] = useState('')
+  const [pinError, setPinError] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const { initialize, error: storageError } = useSecureStorage()
 
-  const handleSetup = async () => {
-    if (!password || password.length < 4) {
-      Alert.alert('Error', 'Password must be at least 4 characters');
-      return;
-    }
+  const shakeX = useSharedValue(0)
+  const firstPin = useRef('')
 
-    if (password !== confirmPassword) {
-      Alert.alert('Error', 'Passwords do not match');
-      return;
-    }
+  const shakeStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: shakeX.value }],
+  }))
 
-    try {
-      setLoading(true);
-      console.log('[SetupPassword] Initializing with password');
-      await initialize(password);
-      console.log('[SetupPassword] Initialization complete');
-      
-      if (__DEV__) {
-        Alert.alert('Success', `Password created!\n\nDEV: Your password is "${password}"`);
-      } else {
-        Alert.alert('Success', 'Password created!');
+  const triggerShake = useCallback(() => {
+    setPinError(true)
+    shakeX.value = withSequence(
+      withTiming(-10, { duration: 50 }),
+      withTiming(10, { duration: 50 }),
+      withTiming(-8, { duration: 50 }),
+      withTiming(8, { duration: 50 }),
+      withTiming(0, { duration: 50 }),
+    )
+    setTimeout(() => setPinError(false), 500)
+  }, [shakeX])
+
+  const handleSetup = useCallback(
+    async (finalPin: string) => {
+      try {
+        setLoading(true)
+        await initialize(finalPin)
+        router.replace('/welcome')
+      } catch (err) {
+        console.error('[SetupPIN] Setup failed:', err)
+        Alert.alert('Error', storageError?.message || 'Setup failed')
+        setPhase('enter')
+        setPin('')
+        setConfirmPin('')
+        firstPin.current = ''
+      } finally {
+        setLoading(false)
       }
-      
-      console.log('[SetupPassword] Navigating to welcome...');
-      router.replace('/welcome');
-    } catch (err) {
-      console.error('[SetupPassword] Setup failed:', err);
-      Alert.alert('Error', error?.message || 'Setup failed');
-    } finally {
-      setLoading(false);
+    },
+    [initialize, storageError],
+  )
+
+  const handleDigit = useCallback(
+    (digit: string) => {
+      if (loading) return
+
+      if (phase === 'enter') {
+        if (pin.length >= PIN_LENGTH) return
+        const next = pin + digit
+        setPin(next)
+        if (next.length === PIN_LENGTH) {
+          firstPin.current = next
+          setTimeout(() => {
+            setPhase('confirm')
+          }, 200)
+        }
+      } else {
+        if (confirmPin.length >= PIN_LENGTH) return
+        const next = confirmPin + digit
+        setConfirmPin(next)
+        if (next.length === PIN_LENGTH) {
+          if (next === firstPin.current) {
+            handleSetup(next)
+          } else {
+            triggerShake()
+            setTimeout(() => setConfirmPin(''), 500)
+          }
+        }
+      }
+    },
+    [loading, phase, pin, confirmPin, handleSetup, triggerShake],
+  )
+
+  const handleDelete = useCallback(() => {
+    if (loading) return
+    if (phase === 'enter') {
+      setPin(prev => prev.slice(0, -1))
+    } else {
+      setConfirmPin(prev => prev.slice(0, -1))
     }
-  };
+  }, [loading, phase])
+
+  const currentFilled = phase === 'enter' ? pin.length : confirmPin.length
 
   return (
-    <View style={styles.container}>
-      {/* Header Section */}
-      <View style={styles.header}>
+    <View style={pinScreenStyles.container}>
+      <PinScreenBackground />
+
+      <View style={pinScreenStyles.topImageSection}>
+        <Image
+          source={require('@/assets/images/bars.png')}
+          style={pinScreenStyles.barsImage}
+          resizeMode="cover"
+        />
+      </View>
+
+      <View style={pinScreenStyles.header}>
         <DashLogo />
-        
-        <Heading 
-          level={1}
-          weight="semibold"
-          style={styles.title}
-        >
-          Setup Password
+
+        <Heading level={1} weight="semibold" style={pinScreenStyles.title}>
+          {phase === 'enter' ? 'Create Wallet' : 'Confirm PIN'}
         </Heading>
-        
-        <Text 
-          variant="body"
-          weight="regular"
-          opacity={60}
-          style={styles.subtitle}
-        >
-          Create a password to protect your wallet.
+
+        <Text variant="body" weight="regular" opacity={60} style={StyleSheet.flatten([pinScreenStyles.subtitle, styles.subtitle]) as TextStyle}>
+          {phase === 'enter'
+            ? 'You will use this PIN to unlock your wallet. Do not share your PIN with others'
+            : 'Re-enter your PIN to confirm'}
         </Text>
       </View>
 
-      {/* Password Setup Block */}
-      <View style={styles.authBlock}>
-        <View style={styles.inputSection}>
-          <Text 
-            variant="body"
-            weight="regular"
-            opacity={60}
-            style={styles.inputLabel}
-          >
-            Password
-          </Text>
-          
-          <Input
-            placeholder="Enter Password"
-            secureTextEntry
-            value={password}
-            onChangeText={setPassword}
-            autoCapitalize="none"
-            autoFocus
-            size="xl"
-            variant="outlined"
-            style={styles.input}
-            textStyle={styles.inputText}
-          />
-        </View>
+      <View style={pinScreenStyles.dotsContainer}>
+        <Animated.View style={[shakeStyle, { width: '100%' }]}>
+          <PinDots filled={currentFilled} error={pinError} />
+        </Animated.View>
+      </View>
 
-        <View style={styles.inputSection}>
-          <Text 
-            variant="body"
-            weight="regular"
-            opacity={60}
-            style={styles.inputLabel}
-          >
-            Confirm Password
-          </Text>
-          
-          <Input
-            placeholder="Re-enter Password"
-            secureTextEntry
-            value={confirmPassword}
-            onChangeText={setConfirmPassword}
-            autoCapitalize="none"
-            size="xl"
-            variant="outlined"
-            style={styles.input}
-            textStyle={styles.inputText}
-          />
-        </View>
-
-        <Button
-          variant="solid"
-          colorScheme="brand"
-          size="xl"
-          onPress={handleSetup}
-          disabled={loading || !password || !confirmPassword}
-          loading={loading}
-          style={styles.button}
-        >
-          <Text weight="regular" style={styles.buttonText}>
-            Create Password
-          </Text>
-        </Button>
+      <View style={pinScreenStyles.bottomSection}>
+        <PinKeypad onPress={handleDigit} onDelete={handleDelete} disabled={loading} />
       </View>
     </View>
-  );
+  )
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F3F3F3',
-    paddingTop: 60,
-    paddingHorizontal: 20,
-    paddingBottom: 40,
-  },
-  header: {
-    alignItems: 'flex-start',
-    marginBottom: 60,
-  },
-  title: {
-    fontSize: 40,
-    lineHeight: 50,
-    letterSpacing: -1.2,
-    color: '#0C1C33',
-    marginBottom: 10,
-  },
   subtitle: {
-    fontSize: 14,
-    lineHeight: 17,
-    color: 'rgba(12, 28, 51, 0.5)',
+    maxWidth: 320,
   },
-  authBlock: {
-    gap: 15,
-    paddingHorizontal: 10,
-  },
-  inputSection: {
-    gap: 10,
-  },
-  inputLabel: {
-    fontSize: 16,
-    lineHeight: 19,
-    color: 'rgba(12, 28, 51, 0.5)',
-  },
-  input: {
-    borderRadius: 20,
-    borderColor: 'rgba(12, 28, 51, 0.32)',
-    borderWidth: 1,
-    backgroundColor: 'transparent',
-    paddingHorizontal: 25,
-    paddingVertical: 20,
-  },
-  inputText: {
-    fontSize: 14,
-    color: 'rgba(12, 28, 51, 0.35)',
-  },
-  button: {
-    backgroundColor: 'rgba(76, 126, 255, 0.15)',
-    borderRadius: 15,
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-  },
-  buttonText: {
-    fontSize: 16,
-    color: '#4C7EFF',
-  },
-});
+})

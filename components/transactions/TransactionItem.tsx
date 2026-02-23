@@ -1,11 +1,11 @@
 import { ThemedText } from '@/components/themed-text';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import { type Transaction } from '@/types/transaction';
-import { Identifier, ValueCard } from 'dash-ui-kit/react-native';
+import { Identifier, TransactionStatusIcon, ValueCard } from 'dash-ui-kit/react-native';
 import { memo } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { ChainBadge } from './ChainBadge';
-import { TransactionIcon } from './TransactionIcon';
 
 export interface TransactionItemProps {
   /**
@@ -73,6 +73,7 @@ function TransactionItemComponent({
   const backgroundColor = useThemeColor({}, 'background');
   const overlayColor = useThemeColor({}, 'overlay');
   const iconColor = useThemeColor({}, 'icon');
+  const colorScheme = useColorScheme() ?? 'light';
 
   const { type, chain, amount, usdAmount, from, to, hash } = transaction;
   
@@ -108,7 +109,7 @@ function TransactionItemComponent({
     >
       <ValueCard colorScheme="lightGray" border={false}>
         <View style={styles.iconContainer}>
-          <TransactionIcon type={type} />
+          <TransactionStatusIcon status="SUCCESS" size={24} theme={colorScheme} />
         </View>
 
         <View style={styles.content}>
@@ -167,7 +168,6 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    gap: 4,
     minWidth: 0, // Prevents overflow
   },
   header: {

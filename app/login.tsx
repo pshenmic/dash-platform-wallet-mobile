@@ -1,393 +1,301 @@
+import { PIN_LENGTH, PinDots, PinKeypad } from '@/components/ui/PinKeypad'
+import { PinScreenBackground } from '@/components/ui/PinScreenBackground'
 import { useSecureStorage } from '@/contexts/SecureStorageContext'
 import { useBiometricAuth } from '@/hooks/use-biometric-auth'
-import { Button, DashLogo, Heading, Input, Text } from 'dash-ui-kit/react-native'
+import { pinScreenStyles } from '@/app/pin-screen.styles'
+import { DashLogo, Heading, Text } from 'dash-ui-kit/react-native'
 import { router } from 'expo-router'
 import { useCallback, useEffect, useState } from 'react'
-import { Alert, Pressable, StyleSheet, View } from 'react-native'
+import { Alert, Image, Pressable, StyleSheet, View } from 'react-native'
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withSequence,
+  withTiming,
+} from 'react-native-reanimated'
 import Svg, { Path } from 'react-native-svg'
 
 export default function LoginScreen() {
-  const [password, setPassword] = useState('');
-  const [loading, setLoading] = useState(false);
-  const { unlock, reset, isInitialized, error } = useSecureStorage();
+  const [pin, setPin] = useState('')
+  const [pinError, setPinError] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const { unlock, reset, isInitialized, error } = useSecureStorage()
   const {
     isAvailable,
-    biometricType,
     authenticate,
     isEnrolled,
     saveBiometricPassword,
     getBiometricPassword,
     clearBiometricPassword,
     hasSavedPassword,
-  } = useBiometricAuth();
+  } = useBiometricAuth()
 
-  // Redirect to setup if storage not initialized
+  const shakeX = useSharedValue(0)
+
+  const shakeStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: shakeX.value }],
+  }))
+
+  const triggerShake = useCallback(() => {
+    setPinError(true)
+    shakeX.value = withSequence(
+      withTiming(-10, { duration: 50 }),
+      withTiming(10, { duration: 50 }),
+      withTiming(-8, { duration: 50 }),
+      withTiming(8, { duration: 50 }),
+      withTiming(0, { duration: 50 }),
+    )
+    setTimeout(() => setPinError(false), 500)
+  }, [shakeX])
+
   useEffect(() => {
-    console.log('[LoginScreen] isInitialized:', isInitialized);
     if (isInitialized === false) {
-      console.log('[LoginScreen] Redirecting to setup-password');
-      router.replace('/setup-password');
+      router.replace('/setup-password')
     }
-  }, [isInitialized]);
+  }, [isInitialized])
 
   const handleBiometricLogin = useCallback(async () => {
     try {
-      setLoading(true);
-      const authSuccess = await authenticate();
+      setLoading(true)
+      const authSuccess = await authenticate()
 
       if (authSuccess) {
-        const savedPassword = await getBiometricPassword();
-        
+        const savedPassword = await getBiometricPassword()
+
         if (savedPassword) {
-          const unlockSuccess = await unlock(savedPassword);
+          const unlockSuccess = await unlock(savedPassword)
 
           if (unlockSuccess) {
-            // Check if wallet is set up (has seed phrase)
-            const { secureStorage } = await import('@/services/storage/secure-storage');
-            const hasSeedPhrase = await secureStorage.getItem('wallet_seed_phrase');
-            
+            const { secureStorage } = await import('@/services/storage/secure-storage')
+            const hasSeedPhrase = await secureStorage.getItem('wallet_seed_phrase')
+
             if (hasSeedPhrase) {
-              router.replace('/(tabs)/home');
+              router.replace('/(tabs)/home')
             } else {
-              router.replace('/welcome');
+              router.replace('/welcome')
             }
           } else {
-            Alert.alert('Error', 'Failed to unlock wallet');
+            Alert.alert('Error', 'Failed to unlock wallet')
           }
         } else {
-          Alert.alert('Error', 'No saved password found');
+          Alert.alert('Error', 'No saved PIN found')
         }
       }
     } catch (err) {
-      console.error('Biometric login error:', err);
+      console.error('Biometric login error:', err)
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  }, [authenticate, getBiometricPassword, unlock]);
+  }, [authenticate, getBiometricPassword, unlock])
 
-  // Auto-trigger biometric authentication on mount if available
   useEffect(() => {
     if (isAvailable && isEnrolled && hasSavedPassword) {
-      handleBiometricLogin();
+      handleBiometricLogin()
     }
-  }, [isAvailable, isEnrolled, hasSavedPassword, handleBiometricLogin]);
+  }, [isAvailable, isEnrolled, hasSavedPassword, handleBiometricLogin])
 
-  const handleLogin = async () => {
-    if (!password) {
-      Alert.alert('Error', 'Please enter password');
-      return;
-    }
-
-    // Check if storage is initialized before attempting login
-    if (isInitialized === false) {
-      console.log('[LoginScreen] Storage not initialized, redirecting to setup');
-      Alert.alert('Not Initialized', 'Please set up a password first');
-      router.replace('/setup-password');
-      return;
-    }
-
-    try {
-      setLoading(true);
-      console.log('[LoginScreen] Attempting unlock...');
-      const success = await unlock(password);
-      console.log('[LoginScreen] Unlock result:', success);
-
-      if (success) {
-        // Save password for biometric auth if available and not saved yet
-        if (isAvailable && isEnrolled && !hasSavedPassword) {
-          try {
-            await saveBiometricPassword(password);
-          } catch (err) {
-            console.error('Failed to save password for biometric auth:', err);
-          }
-        }
-        
-        // Check if wallet is set up (has seed phrase)
-        const { secureStorage } = await import('@/services/storage/secure-storage');
-        const hasSeedPhrase = await secureStorage.getItem('wallet_seed_phrase');
-        
-        if (hasSeedPhrase) {
-          router.replace('/(tabs)/home');
-        } else {
-          router.replace('/welcome');
-        }
-      } else {
-        Alert.alert('Error', error?.message || 'Wrong password');
-        setPassword('');
+  const handleLogin = useCallback(
+    async (finalPin: string) => {
+      if (isInitialized === false) {
+        router.replace('/setup-password')
+        return
       }
-    } catch (err) {
-      console.error('[LoginScreen] Login error:', err);
-      Alert.alert('Error', error?.message || 'Login failed');
-    } finally {
-      setLoading(false);
-    }
-  };
 
-  const handleResetPassword = () => {
+      try {
+        setLoading(true)
+        const success = await unlock(finalPin)
+
+        if (success) {
+          if (isAvailable && isEnrolled && !hasSavedPassword) {
+            try {
+              await saveBiometricPassword(finalPin)
+            } catch (err) {
+              console.error('Failed to save PIN for biometric auth:', err)
+            }
+          }
+
+          const { secureStorage } = await import('@/services/storage/secure-storage')
+          const hasSeedPhrase = await secureStorage.getItem('wallet_seed_phrase')
+
+          if (hasSeedPhrase) {
+            router.replace('/(tabs)/home')
+          } else {
+            router.replace('/welcome')
+          }
+        } else {
+          triggerShake()
+          setTimeout(() => setPin(''), 500)
+          Alert.alert('Error', error?.message || 'Wrong PIN')
+        }
+      } catch (err) {
+        console.error('[LoginScreen] Login error:', err)
+        Alert.alert('Error', error?.message || 'Login failed')
+        setPin('')
+      } finally {
+        setLoading(false)
+      }
+    },
+    [isInitialized, unlock, isAvailable, isEnrolled, hasSavedPassword, saveBiometricPassword, error, triggerShake],
+  )
+
+  const handleDigit = useCallback(
+    (digit: string) => {
+      if (loading || pin.length >= PIN_LENGTH) return
+      const next = pin + digit
+      setPin(next)
+      if (next.length === PIN_LENGTH) {
+        handleLogin(next)
+      }
+    },
+    [loading, pin, handleLogin],
+  )
+
+  const handleDelete = useCallback(() => {
+    if (loading) return
+    setPin(prev => prev.slice(0, -1))
+  }, [loading])
+
+  const handleResetPin = () => {
     Alert.alert(
-      'Reset Password?',
-      'This will delete all encrypted data and reset the app. You will need to set up a new password.',
+      'Reset PIN?',
+      'This will delete all encrypted data and reset the app. You will need to set up a new PIN.',
       [
         { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Reset', 
+        {
+          text: 'Reset',
           style: 'destructive',
           onPress: async () => {
             try {
-              console.log('[LoginScreen] Starting password reset...');
-              await reset();
-              await clearBiometricPassword();
-              console.log('[LoginScreen] Reset complete, biometric cleared');
-              Alert.alert('Success', 'Password reset. Redirecting...');
-              // Will auto-redirect via useEffect when isInitialized becomes false
+              await reset()
+              await clearBiometricPassword()
+              Alert.alert('Success', 'PIN reset. Redirecting...')
             } catch (err) {
-              console.error('[LoginScreen] Reset error:', err);
-              Alert.alert('Error', 'Failed to reset password');
+              console.error('[LoginScreen] Reset error:', err)
+              Alert.alert('Error', 'Failed to reset PIN')
             }
-          }
-        }
-      ]
-    );
-  };
+          },
+        },
+      ],
+    )
+  }
+
+  const BiometricButton = isAvailable && isEnrolled ? (
+    <Pressable onPress={handleBiometricLogin} disabled={loading} style={styles.biometricAction}>
+      <Svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+        <Path
+          d="M14 3C8.48 3 4 7.48 4 13C4 18.52 8.48 23 14 23C19.52 23 24 18.52 24 13C24 7.48 19.52 3 14 3ZM14 8C15.66 8 17 9.34 17 11C17 12.66 15.66 14 14 14C12.34 14 11 12.66 11 11C11 9.34 12.34 8 14 8ZM14 20.4C11.5 20.4 9.29 19.2 7.94 17.35C7.97 15.45 11.5 14.4 14 14.4C16.49 14.4 20.03 15.45 20.06 17.35C18.71 19.2 16.5 20.4 14 20.4Z"
+          fill="rgba(12, 28, 51, 0.64)"
+        />
+      </Svg>
+    </Pressable>
+  ) : undefined
 
   return (
-    <View style={styles.container}>
-      {/* Header Section */}
-      <View style={styles.header}>
+    <View style={pinScreenStyles.container}>
+      <PinScreenBackground />
+
+      <View style={pinScreenStyles.topImageSection}>
+        <Image
+          source={require('@/assets/images/bars.png')}
+          style={pinScreenStyles.barsImage}
+          resizeMode="cover"
+        />
+      </View>
+
+      <View style={pinScreenStyles.header}>
         <DashLogo />
-        
-        <Heading 
-          level={1}
-          weight="semibold"
-          style={styles.title}
-        >
+
+        <Heading level={1} weight="semibold" style={pinScreenStyles.title}>
           Welcome Back
         </Heading>
-        
-        <Text 
-          variant="body"
-          weight="regular"
-          opacity={60}
-          style={styles.subtitle}
-        >
-          Use the password to unlock your wallet.
+
+        <Text variant="body" weight="regular" opacity={60} style={pinScreenStyles.subtitle}>
+          Enter your PIN to unlock your wallet.
         </Text>
       </View>
 
-      {/* Authorization Block */}
-      <View style={styles.authBlock}>
-        <View style={styles.inputSection}>
-          <Text 
-            variant="body"
-            weight="regular"
-            opacity={60}
-            style={styles.inputLabel}
-          >
-            Password
-          </Text>
-          
-          <Input
-            placeholder="Type Your Password"
-            secureTextEntry
-            value={password}
-            onChangeText={setPassword}
-            autoCapitalize="none"
-            autoFocus
-            size="xl"
-            variant="outlined"
-            style={styles.input}
-            textStyle={styles.inputText}
+      <View style={pinScreenStyles.dotsContainer}>
+        <Animated.View style={[shakeStyle, { width: '100%' }]}>
+          <PinDots filled={pin.length} error={pinError} />
+        </Animated.View>
+      </View>
+
+      <View style={pinScreenStyles.bottomSection}>
+        <View style={styles.keypadContainer}>
+          <PinKeypad
+            onPress={handleDigit}
+            onDelete={handleDelete}
+            leftAction={BiometricButton}
+            disabled={loading}
           />
         </View>
 
-        <Button
-          variant="solid"
-          colorScheme="brand"
-          size="xl"
-          onPress={handleLogin}
-          disabled={loading || !password}
-          loading={loading}
-          style={styles.button}
-        >
-          <Text weight="regular" style={styles.buttonText}>
-            Unlock
-          </Text>
-        </Button>
-
-        {/* Biometric Authentication Button */}
-        {isAvailable && isEnrolled && (
-          <Button
-            variant="outline"
-            colorScheme="brand"
-            size="xl"
-            onPress={handleBiometricLogin}
-            disabled={loading}
-            style={styles.biometricButton}
-          >
-            <View style={styles.biometricButtonContent}>
-              <Svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-                <Path
-                  d="M10 2C5.58 2 2 5.58 2 10C2 14.42 5.58 18 10 18C14.42 18 18 14.42 18 10C18 5.58 14.42 2 10 2ZM10 6C11.1 6 12 6.9 12 8C12 9.1 11.1 10 10 10C8.9 10 8 9.1 8 8C8 6.9 8.9 6 10 6ZM10 15.2C8 15.2 6.29 14.16 5.4 12.6C5.42 11 8.4 10.1 10 10.1C11.59 10.1 14.58 11 14.6 12.6C13.71 14.16 12 15.2 10 15.2Z"
-                  fill="#4C7EFF"
-                />
-              </Svg>
-              <Text weight="regular" style={styles.biometricButtonText}>
-                Use {biometricType}
-              </Text>
-            </View>
-          </Button>
-        )}
-      </View>
-
-      {/* Other Actions */}
-      <View style={styles.otherActions}>
-        <Pressable style={styles.actionLink} onPress={() => Alert.alert('Register Wallet', 'Wallet registration flow')}>
-          <Svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-            <Path
-              d="M13.33 2.67H10C9.63 2.67 9.33 2.97 9.33 3.34C9.33 3.71 9.63 4.01 10 4.01H12.39L8 8.4L5.47 5.87C5.21 5.61 4.79 5.61 4.53 5.87L1.2 9.2C0.94 9.46 0.94 9.88 1.2 10.14C1.46 10.4 1.88 10.4 2.14 10.14L5 7.28L7.53 9.81C7.79 10.07 8.21 10.07 8.47 9.81L13.33 4.95V7.34C13.33 7.71 13.63 8.01 14 8.01C14.37 8.01 14.67 7.71 14.67 7.34V3.34C14.67 2.97 14.37 2.67 14 2.67H13.33Z"
-              fill="rgba(12, 28, 51, 0.35)"
-            />
-          </Svg>
-          <Text variant="caption" weight="regular" opacity={40} style={styles.actionText}>
-            Register wallet
-          </Text>
-        </Pressable>
-
-        <View style={styles.divider} />
-
-        <Pressable onPress={handleResetPassword}>
-          <Text variant="caption" weight="regular" opacity={40} style={styles.actionText}>
-            Forgot password?
-          </Text>
-        </Pressable>
-      </View>
-
-      {/* DEV: Reset button */}
-      {__DEV__ && (
-        <View style={styles.devActions}>
-          <Pressable 
-            onPress={async () => {
-              const SecureStore = await import('expo-secure-store');
-              const salt = await SecureStore.getItemAsync('encryption_salt');
-              const verification = await SecureStore.getItemAsync('password_verification');
-              Alert.alert(
-                'Storage State',
-                `isInitialized: ${isInitialized}\n` +
-                `salt exists: ${!!salt}\n` +
-                `verification exists: ${!!verification}\n` +
-                `error: ${error?.message || 'none'}`
-              );
-            }} 
-            style={styles.devButtonInfo}
-          >
-            <Text variant="caption" weight="semibold" style={styles.devButtonInfoText}>
-              [DEV] Check State
+        <View style={styles.otherActions}>
+          <Pressable onPress={() => Alert.alert('Register Wallet', 'Wallet registration flow')}>
+            <Text variant="caption" weight="regular" opacity={40} style={styles.actionText}>
+              Register wallet
             </Text>
           </Pressable>
-          
-          <Pressable onPress={handleResetPassword} style={styles.devButton}>
-            <Text variant="caption" weight="semibold" style={styles.devButtonText}>
-              [DEV] Reset Password
+
+          <View style={styles.divider} />
+
+          <Pressable onPress={handleResetPin}>
+            <Text variant="caption" weight="regular" opacity={40} style={styles.actionText}>
+              Forgot PIN?
             </Text>
           </Pressable>
         </View>
-      )}
+
+        {__DEV__ && (
+          <View style={styles.devActions}>
+            <Pressable
+              onPress={async () => {
+                const SecureStore = await import('expo-secure-store')
+                const salt = await SecureStore.getItemAsync('encryption_salt')
+                const verification = await SecureStore.getItemAsync('password_verification')
+                Alert.alert(
+                  'Storage State',
+                  `isInitialized: ${isInitialized}\n` +
+                    `salt exists: ${!!salt}\n` +
+                    `verification exists: ${!!verification}\n` +
+                    `error: ${error?.message || 'none'}`,
+                )
+              }}
+              style={styles.devButtonInfo}
+            >
+              <Text variant="caption" weight="semibold" style={styles.devButtonInfoText}>
+                [DEV] Check State
+              </Text>
+            </Pressable>
+
+            <Pressable onPress={handleResetPin} style={styles.devButton}>
+              <Text variant="caption" weight="semibold" style={styles.devButtonText}>
+                [DEV] Reset PIN
+              </Text>
+            </Pressable>
+          </View>
+        )}
+      </View>
     </View>
-  );
+  )
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F3F3F3',
-    paddingTop: 60,
-    paddingHorizontal: 20,
-    paddingBottom: 40,
+  keypadContainer: {
+    paddingBottom: 8,
   },
-  header: {
-    alignItems: 'flex-start',
-    marginBottom: 60,
-  },
-  iconContainer: {
-    width: 48,
-    height: 48,
-    marginBottom: 10,
-  },
-  title: {
-    fontSize: 40,
-    lineHeight: 50,
-    letterSpacing: -1.2,
-    color: '#0C1C33',
-    marginBottom: 10,
-  },
-  subtitle: {
-    fontSize: 14,
-    lineHeight: 17,
-    color: 'rgba(12, 28, 51, 0.5)',
-  },
-  authBlock: {
-    gap: 15,
-    paddingHorizontal: 10,
-  },
-  inputSection: {
-    gap: 10,
-  },
-  inputLabel: {
-    fontSize: 16,
-    lineHeight: 19,
-    color: 'rgba(12, 28, 51, 0.5)',
-  },
-  input: {
-    borderRadius: 20,
-    borderColor: 'rgba(12, 28, 51, 0.32)',
-    borderWidth: 1,
-    backgroundColor: 'transparent',
-    paddingHorizontal: 25,
-    paddingVertical: 20,
-  },
-  inputText: {
-    fontSize: 14,
-    color: 'rgba(12, 28, 51, 0.35)',
-  },
-  button: {
-    backgroundColor: 'rgba(76, 126, 255, 0.15)',
-    borderRadius: 15,
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-  },
-  buttonText: {
-    fontSize: 16,
-    color: '#4C7EFF',
-  },
-  biometricButton: {
-    backgroundColor: 'transparent',
-    borderColor: 'rgba(76, 126, 255, 0.32)',
-    borderWidth: 1,
-    borderRadius: 15,
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-  },
-  biometricButtonContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  biometricAction: {
+    width: 131,
+    height: 82,
     justifyContent: 'center',
-    gap: 8,
-  },
-  biometricButtonText: {
-    fontSize: 16,
-    color: '#4C7EFF',
+    alignItems: 'center',
   },
   otherActions: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
     gap: 15,
-    marginTop: 25,
-  },
-  actionLink: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
+    marginTop: 16,
   },
   actionText: {
     fontSize: 12,
@@ -428,4 +336,4 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#007AFF',
   },
-});
+})
