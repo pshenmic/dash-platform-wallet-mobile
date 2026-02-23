@@ -1,4 +1,5 @@
 import React from 'react'
+import { AsteriskIcon } from 'dash-ui-kit/react-native'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 import Svg, { Path } from 'react-native-svg'
 
@@ -15,8 +16,12 @@ export function PinDots({ filled, length = PIN_LENGTH, error = false }: PinDotsP
     <View style={dotStyles.container}>
       {Array.from({ length }).map((_, i) => (
         <View key={i} style={dotStyles.dot}>
-          {i < filled && !error && <View style={dotStyles.dotIndicator} />}
-          {i < filled && error && <View style={dotStyles.dotIndicatorError} />}
+          {i < filled && (
+            <AsteriskIcon
+              size={20}
+              color={error ? '#FF3B30' : '#0C1C33'}
+            />
+          )}
         </View>
       ))}
     </View>
@@ -110,18 +115,6 @@ const dotStyles = StyleSheet.create({
     boxShadow: 'inset 0px 2px 8px rgba(12, 28, 51, 0.06)',
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  dotIndicator: {
-    width: 16,
-    height: 17,
-    borderRadius: 8,
-    backgroundColor: '#0C1C33',
-  },
-  dotIndicatorError: {
-    width: 16,
-    height: 17,
-    borderRadius: 8,
-    backgroundColor: '#FF3B30',
   },
 })
 
