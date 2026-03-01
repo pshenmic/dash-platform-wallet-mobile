@@ -7,7 +7,7 @@ export enum Network {
   testnet = 'testnet'
 }
 
-export enum WalletType {
+export enum WalletKind {
   seedphrase = 'seedphrase',
   keystore = 'keystore'
 }

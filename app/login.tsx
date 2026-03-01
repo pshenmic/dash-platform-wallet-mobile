@@ -5,7 +5,8 @@ import { useBiometricAuth } from '@/hooks/use-biometric-auth'
 import { pinScreenStyles } from '@/app/pin-screen.styles'
 import { DashLogo, Heading, Text } from 'dash-ui-kit/react-native'
 import { router } from 'expo-router'
-import { useCallback, useEffect, useState } from 'react'
+import { clearFailedAttempts, getLockoutDurationMs, getLockoutRemainingMs, incrementFailedAttempts, MAX_ATTEMPTS_BEFORE_LOCKOUT } from '@/services/auth/pin-lockout'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Alert, Image, Pressable, StyleSheet, View } from 'react-native'
 import Animated, {
   useAnimatedStyle,
@@ -15,10 +16,14 @@ import Animated, {
 } from 'react-native-reanimated'
 import Svg, { Path } from 'react-native-svg'
 
+const MAX_ATTEMPTS_BEFORE_WIPE = 10
+
 export default function LoginScreen() {
   const [pin, setPin] = useState('')
   const [pinError, setPinError] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [lockoutSeconds, setLockoutSeconds] = useState(0)
+  const lockoutTimer = useRef<ReturnType<typeof setInterval> | null>(null)
   const { unlock, reset, isInitialized, error } = useSecureStorage()
   const {
     isAvailable,
@@ -54,6 +59,28 @@ export default function LoginScreen() {
     }
   }, [isInitialized])
 
+  const startLockoutCountdown = useCallback((remainingMs: number) => {
+    setLockoutSeconds(Math.ceil(remainingMs / 1000))
+    lockoutTimer.current = setInterval(() => {
+      setLockoutSeconds(prev => {
+        if (prev <= 1) {
+          if (lockoutTimer.current) clearInterval(lockoutTimer.current)
+          return 0
+        }
+        return prev - 1
+      })
+    }, 1000)
+  }, [])
+
+  useEffect(() => {
+    getLockoutRemainingMs().then(ms => {
+      if (ms > 0) startLockoutCountdown(ms)
+    })
+    return () => {
+      if (lockoutTimer.current) clearInterval(lockoutTimer.current)
+    }
+  }, [startLockoutCountdown])
+
   const handleBiometricLogin = useCallback(async () => {
     try {
       setLoading(true)
@@ -66,6 +93,7 @@ export default function LoginScreen() {
           const unlockSuccess = await unlock(savedPassword)
 
           if (unlockSuccess) {
+            await clearFailedAttempts()
             const { secureStorage } = await import('@/services/storage/secure-storage')
             const hasSeedPhrase = await secureStorage.getItem('wallet_seed_phrase')
 
@@ -101,11 +129,20 @@ export default function LoginScreen() {
         return
       }
 
+      const remainingMs = await getLockoutRemainingMs()
+      if (remainingMs > 0) {
+        Alert.alert('Too many attempts', `Try again in ${Math.ceil(remainingMs / 1000)}s`)
+        setPin('')
+        return
+      }
+
       try {
         setLoading(true)
         const success = await unlock(finalPin)
 
         if (success) {
+          await clearFailedAttempts()
+
           if (isAvailable && isEnrolled && !hasSavedPassword) {
             try {
               await saveBiometricPassword(finalPin)
@@ -123,37 +160,56 @@ export default function LoginScreen() {
             router.replace('/welcome')
           }
         } else {
+          const attempts = await incrementFailedAttempts()
           triggerShake()
           setTimeout(() => setPin(''), 500)
-          Alert.alert('Error', error?.message || 'Wrong PIN')
+
+          if (attempts >= MAX_ATTEMPTS_BEFORE_WIPE) {
+            Alert.alert(
+              'Too many failed attempts',
+              'Your wallet has been locked for security. Reset to set up a new PIN.',
+              [{ text: 'Reset', style: 'destructive', onPress: async () => {
+                await reset()
+                await clearBiometricPassword()
+                await clearFailedAttempts()
+              }}],
+            )
+          } else if (attempts >= MAX_ATTEMPTS_BEFORE_LOCKOUT) {
+            const lockMs = getLockoutDurationMs(attempts)
+            startLockoutCountdown(lockMs)
+            Alert.alert('Wrong PIN', `Too many attempts. Try again in ${Math.ceil(lockMs / 1000)}s`)
+          } else {
+            const remaining = MAX_ATTEMPTS_BEFORE_LOCKOUT - attempts
+            Alert.alert('Wrong PIN', `${remaining} attempt${remaining === 1 ? '' : 's'} remaining before lockout`)
+          }
         }
       } catch (err) {
         console.error('[LoginScreen] Login error:', err)
-        Alert.alert('Error', error?.message || 'Login failed')
+        Alert.alert('Error', (err as Error).message || 'Login failed')
         setPin('')
       } finally {
         setLoading(false)
       }
     },
-    [isInitialized, unlock, isAvailable, isEnrolled, hasSavedPassword, saveBiometricPassword, error, triggerShake],
+    [isInitialized, unlock, isAvailable, isEnrolled, hasSavedPassword, saveBiometricPassword, reset, clearBiometricPassword, triggerShake, startLockoutCountdown],
   )
 
   const handleDigit = useCallback(
     (digit: string) => {
-      if (loading || pin.length >= PIN_LENGTH) return
+      if (loading || lockoutSeconds > 0 || pin.length >= PIN_LENGTH) return
       const next = pin + digit
       setPin(next)
       if (next.length === PIN_LENGTH) {
         handleLogin(next)
       }
     },
-    [loading, pin, handleLogin],
+    [loading, lockoutSeconds, pin, handleLogin],
   )
 
   const handleDelete = useCallback(() => {
-    if (loading) return
+    if (loading || lockoutSeconds > 0) return
     setPin(prev => prev.slice(0, -1))
-  }, [loading])
+  }, [loading, lockoutSeconds])
 
   const handleResetPin = () => {
     Alert.alert(
@@ -168,6 +224,7 @@ export default function LoginScreen() {
             try {
               await reset()
               await clearBiometricPassword()
+              await clearFailedAttempts()
               Alert.alert('Success', 'PIN reset. Redirecting...')
             } catch (err) {
               console.error('[LoginScreen] Reset error:', err)
@@ -210,7 +267,9 @@ export default function LoginScreen() {
         </Heading>
 
         <Text variant="body" weight="regular" opacity={60} style={pinScreenStyles.subtitle}>
-          Enter your PIN to unlock your wallet.
+          {lockoutSeconds > 0
+            ? `Too many attempts. Try again in ${lockoutSeconds}s`
+            : 'Enter your PIN to unlock your wallet.'}
         </Text>
       </View>
 

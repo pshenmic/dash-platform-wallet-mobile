@@ -1,9 +1,6 @@
 import { ThemedText } from '@/components/themed-text';
 import { useThemeColor } from '@/hooks/use-theme-color';
-import {
-  useTransactionHistory,
-  type TransactionGroup,
-} from '@/hooks/use-transaction-history';
+import { type TransactionGroup } from '@/hooks/use-transaction-history';
 import { type Transaction } from '@/types/transaction';
 import { Ionicons } from '@expo/vector-icons';
 import {
@@ -14,9 +11,13 @@ import { TransactionGroupHeader } from './TransactionGroupHeader';
 import { TransactionItem } from './TransactionItem';
 
 export interface TransactionListProps {
-  /**
-   * Handler called when a transaction is pressed
-   */
+  /** Transaction groups provided by the parent */
+  transactionGroups: TransactionGroup[];
+  /** Whether transactions are currently loading */
+  isLoading: boolean;
+  /** Error from the parent's data fetch, if any */
+  error: Error | null;
+  /** Handler called when a transaction is pressed */
   onTransactionPress?: (transaction: Transaction) => void;
 }
 
@@ -121,9 +122,13 @@ function flattenGroups(groups: TransactionGroup[]): FlatListItem[] {
  * - Refresh handled by parent ScrollView
  */
 export function TransactionList({
+  transactionGroups,
+  isLoading,
+  error,
   onTransactionPress,
 }: TransactionListProps) {
-  const { groups, loading, error } = useTransactionHistory();
+  const groups = transactionGroups;
+  const loading = isLoading;
 
   const flattenedItems = flattenGroups(groups);
 

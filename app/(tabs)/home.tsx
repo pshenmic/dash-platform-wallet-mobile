@@ -6,9 +6,7 @@
  */
 
 import { LinearGradient } from 'expo-linear-gradient';
-import { router } from 'expo-router';
-import * as SecureStore from 'expo-secure-store';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -26,11 +24,11 @@ import { WalletHeader } from '@/components/wallet/WalletHeader';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Colors } from '@/constants/theme';
+import { useAuthGuard } from '@/hooks/use-auth-guard';
 import { useBalance } from '@/hooks/use-balance';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useTransactionHistory } from '@/hooks/use-transaction-history';
 import { useWalletData } from '@/hooks/use-wallet-data';
-import { secureStorage } from '@/services/storage/secure-storage';
 import { type HomeTab } from '@/types/home';
 import { ValueCard } from 'dash-ui-kit/react-native';
 
@@ -56,55 +54,12 @@ export default function HomeScreen() {
   const { balance, loading: balanceLoading, error: balanceError, refresh: refreshBalance } = useBalance();
   const { groups: transactionGroups, loading: transactionsLoading, error: transactionsError, refresh: refreshTransactions } = useTransactionHistory();
 
-  /**
-   * Check authentication status and redirect if not authenticated
-   * This implements route protection for the home screen
-   */
-  const checkAuthAndLoadData = useCallback(async () => {
-    try {
-      console.log('[HomeScreen] Checking auth status...');
-      
-      // Check if password is set up
-      const salt = await SecureStore.getItemAsync('encryption_salt');
-      
-      if (!salt) {
-        // No password setup - redirect to setup
-        console.log('[HomeScreen] No password found, redirecting to setup');
-        router.replace('/setup-password');
-        return;
-      }
-      
-      if (!secureStorage.isUnlocked()) {
-        // Password exists but locked - redirect to login
-        console.log('[HomeScreen] Storage locked, redirecting to login');
-        router.replace('/login');
-        return;
-      }
-      
-      // Check if wallet exists
-      const seedPhrase = await secureStorage.getItem('wallet_seed_phrase');
-      if (!seedPhrase) {
-        // No wallet - redirect to welcome/setup
-        console.log('[HomeScreen] No wallet found, redirecting to welcome');
-        router.replace('/welcome');
-        return;
-      }
-      
-      // User is authenticated and has wallet
-      console.log('[HomeScreen] Auth check passed');
-      
-    } catch (error) {
-      console.error('[HomeScreen] Auth check failed:', error);
-      // On error, redirect to setup to be safe
-      router.replace('/setup-password');
-    } finally {
-      setIsLoading(false);
-    }
+  const handleAuthenticated = useCallback(() => {
+    console.log('[HomeScreen] Auth check passed');
+    setIsLoading(false);
   }, []);
 
-  useEffect(() => {
-    checkAuthAndLoadData();
-  }, [checkAuthAndLoadData]);
+  useAuthGuard({ onAuthenticated: handleAuthenticated });
 
   /**
    * Handle pull-to-refresh
@@ -296,6 +251,9 @@ export default function HomeScreen() {
               <View style={styles.tabContent}>
                 {activeTab === 'transactions' && (
                   <TransactionList
+                    transactionGroups={transactionGroups}
+                    isLoading={transactionsLoading}
+                    error={transactionsError}
                     onTransactionPress={handleTransactionPress}
                   />
                 )}
