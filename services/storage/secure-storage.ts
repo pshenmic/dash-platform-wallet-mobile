@@ -142,6 +142,37 @@ class SecureStorageService {
   }
 
   /**
+   * Reset password and all encrypted data (DANGEROUS!)
+   * Removes salt, verification, and all stored data
+   */
+  async reset(): Promise<void> {
+    console.log('[SecureStorage] Starting reset...');
+    
+    // Delete in sequence to ensure completion
+    try {
+      await SecureStore.deleteItemAsync('encryption_salt');
+      console.log('[SecureStorage] Deleted encryption_salt');
+    } catch (err) {
+      console.log('[SecureStorage] encryption_salt already deleted or not found');
+    }
+    
+    try {
+      await SecureStore.deleteItemAsync('password_verification');
+      console.log('[SecureStorage] Deleted password_verification');
+    } catch (err) {
+      console.log('[SecureStorage] password_verification already deleted or not found');
+    }
+    
+    this.lock();
+    console.log('[SecureStorage] Reset complete, storage locked');
+    
+    // Verify deletion
+    const saltCheck = await SecureStore.getItemAsync('encryption_salt');
+    const verificationCheck = await SecureStore.getItemAsync('password_verification');
+    console.log('[SecureStorage] Verification - salt exists:', !!saltCheck, 'verification exists:', !!verificationCheck);
+  }
+
+  /**
    * Helper: Encrypt data with given key
    */
   private async encryptWithKey(

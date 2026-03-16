@@ -3,8 +3,9 @@
  */
 
 export * from './enums';
-export * from './key-enums';
+export * from './home';
 export * from './identity';
+export * from './key-enums';
 export * from './key-pair';
-export * from './wallet';
 export * from './storage';
+export * from './wallet';

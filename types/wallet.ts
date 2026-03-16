@@ -1,22 +1,12 @@
 /**
- * Wallet types
+ * Wallet type definitions
  */
 
-import { WalletType, NetworkType } from './enums';
-import { IdentityInfo } from './identity';
+export type WalletType = 'Key Store' | 'Hardware' | 'Watch Only';
 
 export interface Wallet {
-  walletId: string
-  type: WalletType
-  network: NetworkType
-  label: string | null
-  encryptedMnemonic: string | null
-  seedHash: string | null
-  currentIdentity: string | null
-  createdAt: Date
-}
-
-export interface WalletInfo {
-  identities: IdentityInfo[]
-  currentIdentity: string | null
+  id: string;
+  name: string;
+  type: WalletType;
+  address: string;
 }
